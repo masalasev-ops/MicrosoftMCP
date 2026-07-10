@@ -1,0 +1,49 @@
+# ── Build output ───────────────────────────────────────────────────────────
+bin/
+obj/
+artifacts/
+[Dd]ebug/
+[Rr]elease/
+
+# ── Test output ────────────────────────────────────────────────────────────
+TestResults/
+*.coverage
+*.coverlet.json
+coverage*.xml
+coverage*.json
+
+# ── Visual Studio / VS Code / Rider ────────────────────────────────────────
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vsidx
+*.svclog
+.idea/
+*.DotSettings.user
+
+# WPF temporary projects generated during design-time builds
+*_wpftmp.csproj
+*_wpftmp.*
+
+# ── NuGet ──────────────────────────────────────────────────────────────────
+*.nupkg
+*.snupkg
+packages/
+!packages/build/
+
+# ── Local configuration (secrets) ──────────────────────────────────────────
+# Real values live here and must never be committed.
+# The committed template is appsettings.Local.json.example, which does NOT
+# match this pattern (different filename) and stays tracked.
+appsettings.Local.json
+
+# Legacy — no longer used, kept ignored so a stray file is never committed.
+.env
+
+# ── OS cruft ───────────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
