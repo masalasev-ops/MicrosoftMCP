@@ -193,7 +193,7 @@ Everything you built now has a face. [src/LearnMcpTutorial.Wpf/](../src/LearnMcp
 wraps the identical Core library in a desktop app with:
 
 - a **Server** dropdown to switch remote↔local (Step 5, in the UI),
-- a **Provider** dropdown (OpenAI / DeepSeek / Ollama),
+- a **Provider** dropdown (OpenAI / DeepSeek / Ollama / LM Studio),
 - a **live Tool Call Trace** panel (Step 4's callback, animated),
 - **interactive architecture diagrams** that highlight each pipeline stage and
   sequence step in real time,

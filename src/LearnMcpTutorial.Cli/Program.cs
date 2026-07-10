@@ -101,7 +101,7 @@ if (result.CitedUrls.Count > 0)
 // ships for the ApiKey placeholders) the same as a missing key.
 string? Setting(string key) => string.IsNullOrWhiteSpace(config[key]) ? null : config[key];
 
-// Build the raw LLM client from configuration. Same three providers as the WPF
+// Build the raw LLM client from configuration. Same four providers as the WPF
 // app — all OpenAI-compatible via Microsoft.Extensions.AI.OpenAI.
 //
 // DeepSeek's legacy aliases deepseek-chat / deepseek-reasoner retire on
@@ -122,6 +122,12 @@ IChatClient BuildChatClient()
             "ollama",
             Setting("Ollama:ModelId") ?? "llama3.2",
             Setting("Ollama:BaseUrl") ?? "http://localhost:11434/v1"),
+        // LM Studio also exposes an OpenAI-compatible local server and ignores
+        // the credential. Set LMStudio:ModelId to the model you have loaded.
+        "lmstudio" => Chat(
+            "lmstudio",
+            Setting("LMStudio:ModelId") ?? "local-model",
+            Setting("LMStudio:BaseUrl") ?? "http://localhost:1234/v1"),
         // appsettings.json intentionally has no OpenAI:BaseUrl, so the client
         // keeps its own default endpoint unless one is configured.
         _ => Chat(

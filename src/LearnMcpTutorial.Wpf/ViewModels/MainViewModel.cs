@@ -42,7 +42,9 @@ public sealed class MainViewModel : BaseViewModel, IAsyncDisposable
     private CancellationTokenSource? _animCts;
     private Task? _animTask;
 
-    public ObservableCollection<string> Providers { get; } = ["openai", "deepseek", "ollama"];
+    // Order matters: the ComboBox binds SelectedIndex to SelectedProviderIndex,
+    // and SelectedProvider maps that index back to this list.
+    public ObservableCollection<string> Providers { get; } = ["openai", "deepseek", "ollama", "lmstudio"];
 
     private int _selectedProviderIndex;
     public int SelectedProviderIndex
@@ -59,8 +61,14 @@ public sealed class MainViewModel : BaseViewModel, IAsyncDisposable
         }
     }
 
-    public string SelectedProvider => SelectedProviderIndex switch { 0 => "openai", 1 => "deepseek", _ => "ollama" };
-    public bool ShowBaseUrl => SelectedProvider is "deepseek" or "ollama";
+    public string SelectedProvider => SelectedProviderIndex switch
+    {
+        1 => "deepseek",
+        2 => "ollama",
+        3 => "lmstudio",
+        _ => "openai"
+    };
+    public bool ShowBaseUrl => SelectedProvider is "deepseek" or "ollama" or "lmstudio";
 
     private string _modelId = "gpt-4o-mini";
     public string ModelId { get => _modelId; set => SetProperty(ref _modelId, value); }
@@ -248,7 +256,7 @@ public sealed class MainViewModel : BaseViewModel, IAsyncDisposable
     private void LoadConfiguration()
     {
         var provider = _config["Llm:Provider"] ?? "openai";
-        SelectedProviderIndex = provider.ToLowerInvariant() switch { "deepseek" => 1, "ollama" => 2, _ => 0 };
+        SelectedProviderIndex = provider.ToLowerInvariant() switch { "deepseek" => 1, "ollama" => 2, "lmstudio" => 3, _ => 0 };
         McpUrl = _config["Mcp:Url"] ?? "https://learn.microsoft.com/api/mcp";
         _maxTokenBudget = _config.GetValue<int?>("Mcp:MaxTokenBudget");
         LocalServerPath = ResolveLocalServerPath();
@@ -265,10 +273,22 @@ public sealed class MainViewModel : BaseViewModel, IAsyncDisposable
 
     private void UpdateDefaultsForProvider()
     {
-        var section = SelectedProvider switch { "openai" => "OpenAI", "deepseek" => "DeepSeek", _ => "Ollama" };
+        var section = SectionFor(SelectedProvider);
         var m = _config[$"{section}:ModelId"]; if (!string.IsNullOrWhiteSpace(m)) ModelId = m;
         var b = _config[$"{section}:BaseUrl"]; if (!string.IsNullOrWhiteSpace(b)) BaseUrl = b;
     }
+
+    /// <summary>
+    /// Maps a provider id to its appsettings section name. Explicit arms for
+    /// every provider so a new one is never silently read from the wrong section.
+    /// </summary>
+    private static string SectionFor(string provider) => provider switch
+    {
+        "deepseek" => "DeepSeek",
+        "ollama" => "Ollama",
+        "lmstudio" => "LMStudio",
+        _ => "OpenAI"
+    };
 
     private async Task ConnectAsync()
     {
@@ -500,8 +520,7 @@ public sealed class MainViewModel : BaseViewModel, IAsyncDisposable
     private string EffectiveApiKey()
     {
         if (!string.IsNullOrWhiteSpace(ApiKey)) return ApiKey;
-        var section = SelectedProvider switch { "openai" => "OpenAI", "deepseek" => "DeepSeek", _ => "Ollama" };
-        return _config[$"{section}:ApiKey"] ?? "";
+        return _config[$"{SectionFor(SelectedProvider)}:ApiKey"] ?? "";
     }
 
     private IChatClient BuildChatClient()
@@ -517,6 +536,10 @@ public sealed class MainViewModel : BaseViewModel, IAsyncDisposable
             "openai" => new OpenAIClient(apiKey).GetChatClient(ModelId).AsIChatClient(),
             "deepseek" => new OpenAIClient(new System.ClientModel.ApiKeyCredential(apiKey),
                 new OpenAIClientOptions { Endpoint = new Uri(string.IsNullOrWhiteSpace(BaseUrl) ? "https://api.deepseek.com/v1" : BaseUrl) })
+                .GetChatClient(ModelId).AsIChatClient(),
+            // LM Studio ignores the credential but the client requires a non-empty one.
+            "lmstudio" => new OpenAIClient(new System.ClientModel.ApiKeyCredential("lmstudio"),
+                new OpenAIClientOptions { Endpoint = new Uri(string.IsNullOrWhiteSpace(BaseUrl) ? "http://localhost:1234/v1" : BaseUrl) })
                 .GetChatClient(ModelId).AsIChatClient(),
             _ => new OpenAIClient(new System.ClientModel.ApiKeyCredential("ollama"),
                 new OpenAIClientOptions { Endpoint = new Uri(string.IsNullOrWhiteSpace(BaseUrl) ? "http://localhost:11434/v1" : BaseUrl) })

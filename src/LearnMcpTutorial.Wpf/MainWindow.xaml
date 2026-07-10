@@ -380,7 +380,7 @@
                                 </Border.Style>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <TextBlock Text="LLM Provider " FontWeight="Bold" Foreground="White" FontSize="12" />
-                                    <TextBlock Text="  OpenAI  |  DeepSeek  |  Ollama  (switchable via UI)" Foreground="#FFD4C4" FontSize="12" />
+                                    <TextBlock Text="  OpenAI  |  DeepSeek  |  Ollama  |  LM Studio  (switchable via UI)" Foreground="#FFD4C4" FontSize="12" />
                                 </StackPanel>
                             </Border>
 
@@ -504,7 +504,7 @@
                                 </Border.Style>
                                 <StackPanel>
                                     <TextBlock Foreground="White" FontSize="13">
-                                        <Run Text="4. LLM Provider (OpenAI / DeepSeek / Ollama)" FontWeight="Bold" />
+                                        <Run Text="4. LLM Provider (OpenAI / DeepSeek / Ollama / LM Studio)" FontWeight="Bold" />
                                         <Run Text=" — Raw API" />
                                     </TextBlock>
                                     <TextBlock Foreground="#CCC" FontSize="10" TextWrapping="Wrap">

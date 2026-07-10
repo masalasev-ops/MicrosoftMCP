@@ -61,8 +61,8 @@ The window has four zones:
 
 ### Demo Walkthrough
 
-1. **Select provider** — Choose OpenAI, DeepSeek, or Ollama from the dropdown. The Base URL field appears for DeepSeek/Ollama.
-2. **Enter API key** — Type your key in the password box (skip for Ollama).
+1. **Select provider** — Choose OpenAI, DeepSeek, Ollama, or LM Studio from the dropdown. The Base URL field appears for DeepSeek/Ollama/LM Studio.
+2. **Enter API key** — Type your key in the password box (skip for Ollama and LM Studio).
 3. **Click Connect** — The app connects to the MCP server over Streamable HTTP. Three tools appear in the Discovered Tools list.
 4. **Ask a question** — Type or paste a question, then click the blue **Ask** button (or press **Ctrl+Enter** or **Shift+Enter**).
 5. **Watch the trace** — Each tool call appears in real-time: 🔧 for tool invocations, 💬 for LLM responses.
@@ -178,5 +178,5 @@ for the Architecture tab.
 - **Clear:** Click Clear to reset everything (question, answer, trace, architecture state) — and start a fresh multi-turn conversation.
 - **Multi-turn:** Ask follow-up questions without repeating context — the agent remembers prior turns. Switching provider or reconnecting starts fresh.
 - **Provider switching:** Change providers anytime — the next Ask rebuilds the chat client (and resets the conversation) with new settings.
-- **No API key?** Use Ollama (run `ollama pull llama3.2` first, select Ollama in dropdown, leave API key blank).
+- **No API key?** Use a local model — Ollama (`ollama pull llama3.2`) or LM Studio (load a model and start its server). Select it in the dropdown and leave the API key blank.
 - **Dark code theme:** Code blocks in answers render with `#1E1E1E` background, monospace font, and basic syntax coloring for C#, bash, JSON, and CLI commands.

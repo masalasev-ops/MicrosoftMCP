@@ -11,8 +11,8 @@ A complete, runnable .NET 10 tutorial that teaches **both halves of MCP**:
 The same client code talks to either server — remote Learn (HTTP) or your local
 server (stdio) — proving MCP clients are server-agnostic. The WPF app adds
 real-time tool-call tracing, interactive architecture diagrams that highlight
-each step live, provider switching (OpenAI / DeepSeek / Ollama), and IDE-style
-markdown rendering for code blocks.
+each step live, provider switching (OpenAI / DeepSeek / Ollama / LM Studio), and
+IDE-style markdown rendering for code blocks.
 
 > **Prefer to learn by building?** Follow the **[6-step tutorial](docs/TUTORIAL.md)** —
 > from a 40-line client that just lists tools, up through the LLM loop, tracing,
@@ -99,7 +99,7 @@ User Question
            ▼
 ┌──────────────────────────────────────┐
 │ 4. LLM Provider (OpenAI / DeepSeek / │  Raw API call
-│    Ollama — switchable via UI/config)│
+│    Ollama / LM Studio, via UI/config)│
 └──────────────────────────────────────┘
 ```
 
@@ -208,6 +208,7 @@ for least-privilege guidance and why even read-only tool output is untrusted dat
   - **OpenAI:** API key from [platform.openai.com](https://platform.openai.com)
   - **DeepSeek:** API key from [platform.deepseek.com](https://platform.deepseek.com) (OpenAI-compatible API)
   - **Ollama:** free local — no key needed (see [§8](#8-running-for-free-with-ollama))
+  - **LM Studio:** free local — no key needed (OpenAI-compatible server, see [§8](#8-running-for-free-with-ollama))
 
 ### Setup
 
@@ -452,6 +453,7 @@ configuration section:
 | `"Llm": { "Provider": "openai" }` | OpenAI | `gpt-4o-mini` |
 | `"Llm": { "Provider": "deepseek" }` | DeepSeek | `deepseek-v4-flash` |
 | `"Llm": { "Provider": "ollama" }` | Ollama (local) | `llama3.2` |
+| `"Llm": { "Provider": "lmstudio" }` | LM Studio (local) | `local-model` |
 
 Both apps read `{Section}:ModelId`, `{Section}:BaseUrl` and `{Section}:ApiKey`
 from the matching section. `OpenAI` has no `BaseUrl` by default, so the OpenAI
@@ -586,6 +588,20 @@ The app points at `http://localhost:11434/v1` (Ollama's OpenAI-compatible endpoi
 reliably as GPT-4o. For best results with Ollama, try a larger model like
 `llama3.1:70b` or `mistral-large` if your hardware supports it.
 
+### LM Studio
+
+[LM Studio](https://lmstudio.ai) exposes the same kind of OpenAI-compatible local
+server, so it works identically:
+
+1. Load a model in LM Studio and start its server (**Developer → Start Server**).
+2. Set `Llm:Provider` to `lmstudio`, or pick **lmstudio** in the UI dropdown.
+3. Set `LMStudio:ModelId` to the loaded model's identifier — LM Studio lists it
+   under the server's `/v1/models`. The default `local-model` works when a single
+   model is loaded and the server serves it regardless of the requested name.
+
+The app points at `http://localhost:1234/v1` and needs no API key. The same tool-use
+quality caveat applies as for Ollama.
+
 ### Poke the server without writing code
 
 **MCP Inspector** (Node.js-based, free):
@@ -698,6 +714,7 @@ vs. write, gated vs. ungated — is the entire point of the annotations above.
 | `Could not find the local MCP server` | `LocalServer:ProjectPath` is wrong, or the solution isn't built | Build the solution, or point the setting at the server's project directory |
 | `The MCP server exited before the handshake completed` | Server crashed on startup | Run `dotnet run --project src/LearnMcpTutorial.Server` directly to see its output |
 | Ollama not responding | Ollama not running | Run `ollama serve` then pull a model |
+| LM Studio: connection refused or `model not found` | Server not started, or `LMStudio:ModelId` doesn't match | Start the server (Developer → Start Server) and set `LMStudio:ModelId` to a loaded model |
 | Build error: `ModelContextProtocol.Transport` not found | Namespace changed | Transport types are in `ModelContextProtocol.Client` in v1.4.0 |
 | `NU1008` on build | A `<PackageReference>` has a `Version` attribute | Versions live in [Directory.Packages.props](Directory.Packages.props) — remove the attribute |
 
