@@ -1,0 +1,37 @@
+# Normalize every text file to LF *in the repository*, but check it out with
+# the platform's native line endings (CRLF on Windows). This kills the
+# cross-platform diff churn that would otherwise appear once CI builds on
+# Ubuntu, without rewriting the Windows working tree or fighting Visual
+# Studio, which writes CRLF by default.
+#
+# The tree is mixed today: Core + Wpf .csproj are LF/no-BOM, while Server,
+# Cli, Tests, steps and typeprobe are CRLF+BOM. Landing this before the
+# source import means normalization happens once, at `git add` time.
+* text=auto
+
+# Visual Studio does not reliably round-trip LF solution files.
+*.sln*   text eol=crlf
+
+# Source and configuration: normalized in-repo, native on checkout.
+*.cs       text
+*.csproj   text
+*.props    text
+*.targets  text
+*.xaml     text
+*.json     text
+*.md       text
+
+# These must be LF on every platform: shell scripts fail with CRLF shebangs,
+# and GitHub Actions runners execute workflow scripts under bash.
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.sh    text eol=lf
+
+# Never touch these.
+*.png binary
+*.jpg binary
+*.ico binary
+*.snk binary
+*.dll binary
+*.exe binary
+*.pdb binary
