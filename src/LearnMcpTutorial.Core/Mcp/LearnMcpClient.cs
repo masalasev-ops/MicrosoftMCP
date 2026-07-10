@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol;
 using ModelContextProtocol.Client;
 
 namespace LearnMcpTutorial.Mcp;
@@ -74,49 +76,94 @@ public sealed class LearnMcpClient : IAsyncDisposable
     /// </summary>
     public string TransportDescription => _transportConfig.DisplayName;
 
+    /// <summary>How long to wait for a connection when the caller doesn't say.</summary>
+    public static readonly TimeSpan DefaultConnectTimeout = TimeSpan.FromSeconds(30);
+
     /// <summary>
     /// Connects to the configured MCP server and discovers available tools.
     /// </summary>
-    public async Task ConnectAsync(CancellationToken cancellationToken = default)
+    /// <param name="cancellationToken">Cancels the connect attempt.</param>
+    /// <param name="connectTimeout">
+    /// Deadline for the whole connect + discover sequence. Defaults to
+    /// <see cref="DefaultConnectTimeout"/>. Without this the stdio path had no
+    /// deadline at all: a server that starts but never completes the handshake
+    /// would hang forever.
+    /// </param>
+    /// <exception cref="McpConnectionException">
+    /// The server could not be reached. Carries transport-specific guidance and
+    /// the original failure as <see cref="Exception.InnerException"/>.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// <paramref name="cancellationToken"/> was cancelled by the caller.
+    /// </exception>
+    public async Task ConnectAsync(
+        CancellationToken cancellationToken = default,
+        TimeSpan? connectTimeout = null)
     {
+        var timeout = connectTimeout ?? DefaultConnectTimeout;
+
+        using var timeoutCts = new CancellationTokenSource(timeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, timeoutCts.Token);
+
         // ─────────────────────────────────────────────────────────────────
         // THE ONLY THING THAT DIFFERS BETWEEN SERVERS: the transport.
         // Build an IClientTransport from the config, then everything below
         // is identical whether we're talking to the remote Learn server or
         // a local stdio server.
         // ─────────────────────────────────────────────────────────────────
-        IClientTransport transport = _transportConfig switch
+        IClientTransport transport;
+        try
         {
-            HttpTransportConfig http => BuildHttpTransport(http),
-            StdioTransportConfig stdio => BuildStdioTransport(stdio),
-            _ => throw new NotSupportedException(
-                $"Unsupported transport config: {_transportConfig.GetType().Name}")
-        };
-
-        // Create the MCP client. The returned McpClient is IAsyncDisposable.
-        _client = await McpClient.CreateAsync(
-            transport,
-            clientOptions: new McpClientOptions
+            transport = _transportConfig switch
             {
-                // Give the client a recognizable identity.
-                ClientInfo = new() { Name = "LearnMcpTutorial", Version = "1.0.0" }
-            },
-            cancellationToken: cancellationToken);
+                HttpTransportConfig http => BuildHttpTransport(http, timeout),
+                StdioTransportConfig stdio => BuildStdioTransport(stdio),
+                _ => throw new NotSupportedException(
+                    $"Unsupported transport config: {_transportConfig.GetType().Name}")
+            };
+        }
+        catch (UriFormatException ex)
+        {
+            throw new McpConnectionException(
+                $"'{(_transportConfig as HttpTransportConfig)?.Url}' is not a valid MCP endpoint URL. " +
+                "Check Mcp:Url in appsettings.Local.json.", ex);
+        }
 
-        // --- Rule 3: Handle listChanged notifications ---
-        // When the server adds, removes, or updates tools, it sends a
-        // notifications/tools/list_changed push.  We refresh our cache
-        // automatically so the agent always uses the current schema.
-        _client.RegisterNotificationHandler(
-            "notifications/tools/list_changed",
-            async (_, ct) =>
-            {
-                _logger.LogInformation("Received listChanged notification — refreshing tool cache");
-                await RefreshToolsAsync(ct);
-            });
+        try
+        {
+            // Create the MCP client. The returned McpClient is IAsyncDisposable.
+            _client = await McpClient.CreateAsync(
+                transport,
+                clientOptions: new McpClientOptions
+                {
+                    // Give the client a recognizable identity.
+                    ClientInfo = new() { Name = "LearnMcpTutorial", Version = "1.0.0" }
+                },
+                cancellationToken: linked.Token);
 
-        // --- Rule 1: Discover tools dynamically at runtime ---
-        await RefreshToolsAsync(cancellationToken);
+            // --- Rule 3: Handle listChanged notifications ---
+            // When the server adds, removes, or updates tools, it sends a
+            // notifications/tools/list_changed push.  We refresh our cache
+            // automatically so the agent always uses the current schema.
+            _client.RegisterNotificationHandler(
+                "notifications/tools/list_changed",
+                async (_, ct) =>
+                {
+                    _logger.LogInformation("Received listChanged notification — refreshing tool cache");
+                    await RefreshToolsAsync(ct);
+                });
+
+            // --- Rule 1: Discover tools dynamically at runtime ---
+            await RefreshToolsAsync(linked.Token);
+        }
+        catch (Exception ex) when (ex is not McpConnectionException)
+        {
+            // A client created before the failure owns a child process (stdio) or
+            // an HTTP session. Drop it, or --local leaves an orphaned `dotnet run`.
+            await DisposeClientAsync();
+            throw Translate(ex, cancellationToken, timeout);
+        }
 
         _connected = true;
         _logger.LogInformation(
@@ -125,9 +172,73 @@ public sealed class LearnMcpClient : IAsyncDisposable
     }
 
     /// <summary>
+    /// Turns a transport-level failure into an <see cref="McpConnectionException"/>
+    /// whose message tells the user what to do about it.
+    /// </summary>
+    private Exception Translate(Exception ex, CancellationToken callerToken, TimeSpan timeout)
+    {
+        var target = _transportConfig switch
+        {
+            HttpTransportConfig http => http.Url,
+            StdioTransportConfig stdio => $"{stdio.Command} {string.Join(' ', stdio.Arguments)}",
+            _ => _transportConfig.DisplayName
+        };
+
+        return ex switch
+        {
+            // The caller asked to stop. That is not a connection failure.
+            OperationCanceledException when callerToken.IsCancellationRequested => ex,
+
+            OperationCanceledException => new McpConnectionException(
+                $"Timed out after {timeout.TotalSeconds:0.#}s connecting to '{target}' via " +
+                $"{_transportConfig.DisplayName}. The server may be unreachable, or slow to start.", ex),
+
+            // Derives from IOException, so it must be tested before one.
+            ClientTransportClosedException => new McpConnectionException(
+                $"The MCP server exited before the handshake completed ({target}). " +
+                "Run it directly to see its output — a build error or a crash on startup " +
+                "is the usual cause.", ex),
+
+            // Process could not be started: command not on PATH, or not executable.
+            Win32Exception => new McpConnectionException(
+                $"Could not start the MCP server process '{(_transportConfig as StdioTransportConfig)?.Command}'. " +
+                "Check that the .NET SDK is installed and on your PATH.", ex),
+
+            HttpRequestException => new McpConnectionException(
+                $"Could not reach the MCP server at '{target}'. Check the URL, your network, " +
+                "and whether the server is running.", ex),
+
+            // McpProtocolException derives from McpException, so this covers both.
+            McpException => new McpConnectionException(
+                $"The MCP server at '{target}' responded, but the protocol handshake failed. " +
+                "The server may speak a different MCP version.", ex),
+
+            IOException => new McpConnectionException(
+                $"Lost the connection to the MCP server ({target}) while connecting.", ex),
+
+            _ => new McpConnectionException(
+                $"Failed to connect to the MCP server via {_transportConfig.DisplayName} ({target}).", ex)
+        };
+    }
+
+    private async Task DisposeClientAsync()
+    {
+        if (_client is null) return;
+        try
+        {
+            await _client.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Ignoring failure while disposing a half-open MCP client");
+        }
+        _client = null;
+    }
+
+    /// <summary>
     /// Builds a Streamable HTTP transport for a remote MCP server.
     /// </summary>
-    private IClientTransport BuildHttpTransport(HttpTransportConfig config)
+    private IClientTransport BuildHttpTransport(HttpTransportConfig config, TimeSpan connectTimeout)
     {
         var url = config.Url;
 
@@ -147,15 +258,23 @@ public sealed class LearnMcpClient : IAsyncDisposable
         {
             Endpoint = new Uri(url),
             TransportMode = HttpTransportMode.StreamableHttp,
-            ConnectionTimeout = TimeSpan.FromSeconds(30)
+            ConnectionTimeout = connectTimeout
         });
     }
 
     /// <summary>
     /// Builds a stdio transport that launches a local MCP server as a child process.
     /// </summary>
+    /// <remarks>
+    /// The command and its arguments are checked before the process is spawned.
+    /// A missing project directory or DLL otherwise surfaces as a child process
+    /// that exits immediately, which the caller sees as a closed transport rather
+    /// than as the obvious "that path doesn't exist".
+    /// </remarks>
     private IClientTransport BuildStdioTransport(StdioTransportConfig config)
     {
+        VerifyStdioTargetExists(config);
+
         _logger.LogInformation(
             "Launching local MCP server '{Label}' (transport: stdio): {Command} {Args}",
             config.Label, config.Command, string.Join(' ', config.Arguments));
@@ -166,6 +285,42 @@ public sealed class LearnMcpClient : IAsyncDisposable
             Command = config.Command,
             Arguments = [.. config.Arguments]
         });
+    }
+
+    /// <summary>
+    /// Fails fast when the thing we are about to launch plainly isn't there.
+    /// A bare command name (e.g. "dotnet") is left to PATH resolution, which
+    /// surfaces as a <see cref="Win32Exception"/> and is translated separately.
+    /// </summary>
+    private static void VerifyStdioTargetExists(StdioTransportConfig config)
+    {
+        var command = config.Command;
+        if (command.AsSpan().IndexOfAny(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) >= 0
+            && !File.Exists(command))
+        {
+            throw new McpConnectionException(
+                $"The MCP server executable '{command}' does not exist.");
+        }
+
+        var args = config.Arguments;
+        for (var i = 0; i < args.Count; i++)
+        {
+            if (args[i] is "--project" && i + 1 < args.Count)
+            {
+                var project = args[i + 1];
+                if (!Directory.Exists(project) && !File.Exists(project))
+                {
+                    throw new McpConnectionException(
+                        $"The MCP server project '{project}' does not exist. " +
+                        "Check LocalServer:ProjectPath in appsettings.Local.json.");
+                }
+            }
+            else if (args[i].EndsWith(".dll", StringComparison.OrdinalIgnoreCase) && !File.Exists(args[i]))
+            {
+                throw new McpConnectionException(
+                    $"The MCP server assembly '{args[i]}' does not exist. Build or publish it first.");
+            }
+        }
     }
 
     /// <summary>
@@ -222,12 +377,7 @@ public sealed class LearnMcpClient : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_client is not null)
-        {
-            await _client.DisposeAsync();
-            _client = null;
-        }
-
+        await DisposeClientAsync();
         _connected = false;
     }
 }

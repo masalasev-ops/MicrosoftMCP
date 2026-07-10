@@ -256,24 +256,12 @@ public sealed class MainViewModel : BaseViewModel, IAsyncDisposable
     }
 
     /// <summary>
-    /// Resolves the local MCP server's project directory. Walks up from the
-    /// app's base directory to find the repo root (marked by MicrosoftMCP.slnx),
-    /// then appends the configured relative path.
+    /// Pre-fills the editable "local server path" field. Shared with the CLI via
+    /// <see cref="LocalServerLocator"/>; never throws, so a bad path shows up in
+    /// the textbox for the user to correct rather than blocking startup.
     /// </summary>
-    private string ResolveLocalServerPath()
-    {
-        var relative = _config["LocalServer:ProjectPath"] ?? "src/LearnMcpTutorial.Server";
-
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "MicrosoftMCP.slnx")))
-            dir = dir.Parent;
-
-        // If we found the repo root, build an absolute path; otherwise fall
-        // back to the relative path (the user can edit it in the UI).
-        return dir is not null
-            ? Path.GetFullPath(Path.Combine(dir.FullName, relative))
-            : relative;
-    }
+    private string ResolveLocalServerPath() =>
+        LocalServerLocator.ResolveProjectPathForDisplay(_config["LocalServer:ProjectPath"]);
 
     private void UpdateDefaultsForProvider()
     {
@@ -298,11 +286,10 @@ public sealed class MainViewModel : BaseViewModel, IAsyncDisposable
             // server and the local stdio server. DocsAgent, the tool loop,
             // tracing, and the UI are all completely unchanged.
             // ─────────────────────────────────────────────────────────────
+            // LocalServerPath is user-editable, so resolve it again here rather
+            // than trusting the value computed at startup.
             McpTransportConfig transport = IsLocalServer
-                ? new StdioTransportConfig(
-                    Command: "dotnet",
-                    Arguments: ["run", "--project", LocalServerPath, "--no-build"],
-                    Label: "LearnMcpTutorial.Server")
+                ? LocalServerLocator.Resolve(LocalServerPath)
                 : new HttpTransportConfig(McpUrl, _maxTokenBudget);
 
             _learnClient = new LearnMcpClient(_loggerFactory.CreateLogger<LearnMcpClient>(), transport);

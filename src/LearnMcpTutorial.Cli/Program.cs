@@ -51,10 +51,7 @@ using var loggerFactory = LoggerFactory.Create(b => b
 
 // ── STEP 2: connect + discover tools (transport-agnostic) ──
 McpTransportConfig transport = useLocal
-    ? new StdioTransportConfig(
-        Command: "dotnet",
-        Arguments: ["run", "--project", ResolveServerPath(), "--no-build"],
-        Label: "LearnMcpTutorial.Server")
+    ? LocalServerLocator.Resolve(Setting("LocalServer:ProjectPath"))
     : new HttpTransportConfig(
         Setting("Mcp:Url") ?? "https://learn.microsoft.com/api/mcp",
         config.GetValue<int?>("Mcp:MaxTokenBudget"));
@@ -160,18 +157,6 @@ string RequireKey(string section) =>
               Alternatives: pass --list to skip the LLM entirely, or set
               Llm:Provider to "ollama" to run a local model with no key.
               """);
-
-// Walk up from the CLI's base dir to the repo root (MicrosoftMCP.slnx),
-// then point at the server project so --local can launch it over stdio.
-static string ResolveServerPath()
-{
-    var dir = new DirectoryInfo(AppContext.BaseDirectory);
-    while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "MicrosoftMCP.slnx")))
-        dir = dir.Parent;
-    return dir is not null
-        ? Path.GetFullPath(Path.Combine(dir.FullName, "src/LearnMcpTutorial.Server"))
-        : "src/LearnMcpTutorial.Server";
-}
 
 static string Trim(string? s, int max) =>
     string.IsNullOrEmpty(s) ? "" : s.Length <= max ? s : s[..(max - 1)] + "…";
