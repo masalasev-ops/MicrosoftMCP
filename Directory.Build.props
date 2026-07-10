@@ -1,0 +1,31 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Absolute path to the repo root, with a trailing slash (MSBuildThisFileDirectory
+         always ends in one). Projects use this to reference files that live outside
+         their own directory, e.g. the shared appsettings.json. -->
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+  </PropertyGroup>
+
+  <!-- Defaults shared by every project in the repo, including the two that sit
+       outside MicrosoftMCP.slnx (steps/step2-list-tools, docs/typeprobe): MSBuild
+       walks up the directory tree to find this file regardless of solution
+       membership.
+
+       This file is imported before each .csproj body, so a project may still
+       override any of these. LearnMcpTutorial.Wpf does exactly that, replacing
+       TargetFramework with net10.0-windows.
+
+       OutputType and RootNamespace are deliberately NOT centralized: Core and
+       Tests are libraries while the rest are executables, and Core / step2 each
+       need a root namespace that differs from their directory name. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Product>LearnMcpTutorial</Product>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>
