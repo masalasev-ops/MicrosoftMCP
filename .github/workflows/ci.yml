@@ -70,14 +70,6 @@ jobs:
       - name: Test
         run: dotnet test tests/LearnMcpTutorial.Tests/LearnMcpTutorial.Tests.csproj
 
-      # Out-of-solution projects. Central Package Management reaches them from
-      # the repo root, so a broken Directory.Packages.props breaks them too.
-      - name: Build steps/step2-list-tools
-        run: dotnet build steps/step2-list-tools/step2-list-tools.csproj
-
-      - name: Build docs/typeprobe
-        run: dotnet build docs/typeprobe/_typeprobe.csproj
-
       # The headless CLI must run on Linux against the local stdio server.
       # --list needs no API key and no network.
       - name: Smoke-test CLI against the local server

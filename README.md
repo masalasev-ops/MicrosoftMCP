@@ -276,8 +276,6 @@ Linux.
 | `LearnMcpTutorial.Server` | `net10.0` | ✅ | ✅ |
 | `LearnMcpTutorial.Cli` | `net10.0` | ✅ | ✅ |
 | `LearnMcpTutorial.Tests` | `net10.0` | ✅ | ✅ |
-| `steps/step2-list-tools` | `net10.0` | ✅ | ✅ |
-| `docs/typeprobe` | `net10.0` | ✅ | ✅ |
 | `LearnMcpTutorial.Wpf` | `net10.0-windows` | ✅ | ❌ WPF is Windows-only |
 
 Because the solution contains the WPF project, `dotnet build MicrosoftMCP.slnx`
@@ -311,8 +309,6 @@ A few things worth knowing before you change a `.csproj`:
   sets `TargetFramework`, `Nullable`, `LangVersion` and `$(RepoRoot)` for every
   project. A project may still override any of them — WPF overrides
   `TargetFramework`.
-- **Both props files apply to `steps/` and `docs/typeprobe/` too**, even though
-  neither is in the solution: MSBuild walks the directory tree, not the solution.
 
 ## 6. Project Structure
 
@@ -350,15 +346,9 @@ src/
 
 tests/
   LearnMcpTutorial.Tests/         # xUnit: DocsAgent unit tests + local-server integration test
-steps/
-  step2-list-tools/               # Standalone ~40-line minimal client (tutorial Step 2)
 docs/
   TUTORIAL.md                     # The 6-step learning path
-  typeprobe/                      # Appendix: how the SDK surface was verified by reflection
 ```
-
-The `steps/` project is intentionally **outside the solution** — it's a
-self-contained teaching snapshot you run on its own (see [docs/TUTORIAL.md](docs/TUTORIAL.md)).
 
 ### The server half — `LearnMcpTutorial.Server`
 

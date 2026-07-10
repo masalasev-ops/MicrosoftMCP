@@ -2,12 +2,8 @@
 
   <!-- Central Package Management: every package version for the whole repo lives
        here, and the .csproj files carry bare <PackageReference Include="..." />
-       with no Version attribute.
-
-       This file sits at the repo root, so MSBuild's directory walk applies it to
-       steps/step2-list-tools and docs/typeprobe as well, even though neither is a
-       member of MicrosoftMCP.slnx. Their Version attributes had to be stripped
-       too, or the build fails with NU1008. -->
+       with no Version attribute. A Version attribute on a PackageReference while
+       this is enabled fails the build with NU1008. -->
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>

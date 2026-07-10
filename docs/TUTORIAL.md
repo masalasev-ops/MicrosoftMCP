@@ -3,19 +3,14 @@
 This is a staged learning path. Each step is small, runnable, and builds on the
 last — climb from "poke a server with no code" all the way to the full WPF app.
 
-Every step below points at **real, runnable code in this repo**. You don't have
-to check anything out — each stage exists as its own project or is a documented
-increment on the previous one.
-
-> **Want git tags?** This repo doesn't ship a git history, but the steps map
-> cleanly onto tags if you want them. After `git init && git add -A && git commit`,
-> you can tag the tree and, for the early stages, check out the standalone step
-> projects. The **Where the code lives** column below is the source of truth.
+Steps 3–6 point at **real, shipped code in this repo** — you don't have to check
+anything out. Step 2 is a self-contained snippet you can paste into a scratch
+console app.
 
 | Step | You learn | Where the code lives | Run it |
 |---|---|---|---|
 | 1 | What a server exposes (no code) | — | MCP Inspector |
-| 2 | Connect + discover tools | [steps/step2-list-tools/](../steps/step2-list-tools/) | `dotnet run --project steps/step2-list-tools` |
+| 2 | Connect + discover tools | snippet below (≈12 lines) | paste into a scratch console app |
 | 3 | Add the LLM tool-calling loop | [src/LearnMcpTutorial.Cli/](../src/LearnMcpTutorial.Cli/) + [DocsAgent](../src/LearnMcpTutorial.Core/Agent/DocsAgent.cs) | `dotnet run --project src/LearnMcpTutorial.Cli -- "<question>"` |
 | 4 | Add live tool-call tracing | [ToolCallTracingChatClient](../src/LearnMcpTutorial.Core/Diagnostics/ToolCallTracingChatClient.cs) | same CLI — watch the 🔧/💬 trace |
 | 5 | Author your own server + point the client at it | [src/LearnMcpTutorial.Server/](../src/LearnMcpTutorial.Server/) | `dotnet run --project src/LearnMcpTutorial.Cli -- --local --list` |
@@ -43,17 +38,12 @@ resources) that a client discovers at runtime. Nothing is hardcoded.
 
 ## Step 2 — Your first client: connect + list tools
 
-The smallest possible MCP client — about 40 lines, one package
-(`ModelContextProtocol`), no LLM. It connects to the Learn server and prints
-its tools.
+The smallest possible MCP client — about a dozen lines, one package
+(`ModelContextProtocol`), no LLM. It connects to the Learn server and prints its
+tools. To run it, paste it into a fresh console app (`dotnet new console` then
+`dotnet add package ModelContextProtocol`).
 
-**Run it:**
-
-```bash
-dotnet run --project steps/step2-list-tools
-```
-
-**The whole program** ([steps/step2-list-tools/Program.cs](../steps/step2-list-tools/Program.cs)):
+**The whole program:**
 
 ```csharp
 using ModelContextProtocol.Client;
