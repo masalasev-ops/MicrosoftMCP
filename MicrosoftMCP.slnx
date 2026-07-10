@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LearnMcpTutorial.Cli/LearnMcpTutorial.Cli.csproj" />
+    <Project Path="src/LearnMcpTutorial.Core/LearnMcpTutorial.Core.csproj" />
+    <Project Path="src/LearnMcpTutorial.Server/LearnMcpTutorial.Server.csproj" />
+    <Project Path="src/LearnMcpTutorial.Wpf/LearnMcpTutorial.Wpf.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LearnMcpTutorial.Tests/LearnMcpTutorial.Tests.csproj" />
+  </Folder>
+</Solution>
