@@ -320,24 +320,21 @@ Your local server exposes all three MCP primitives. Tools you've already called;
 are the other two, straight from the client:
 
 ```csharp
+using ModelContextProtocol.Protocol;   // TextContentBlock, TextResourceContents
+
 // PROMPT — user-driven template. The server expands it; the host decides what to do next.
 var prompt = await client.GetPromptAsync("code_review",
     new Dictionary<string, object?> { ["language"] = "csharp", ["focus"] = "async" });
-Console.WriteLine(prompt.Messages[0].Content);      // the expanded review instructions
+Console.WriteLine(((TextContentBlock)prompt.Messages[0].Content).Text);   // the expanded review instructions
 
 // RESOURCE — app-driven data, addressed by URI. No model decision, no side effects.
 var res = await client.ReadResourceAsync("dotnet-versions");
-Console.WriteLine(res.Contents[0].Text);            // the markdown version table
+Console.WriteLine(((TextResourceContents)res.Contents[0]).Text);          // the markdown version table
 ```
 
 **Expected output** (abbreviated): the prompt prints an expanded code-review message
 parameterised on `csharp`/`async`; the resource prints the `.NET` versions markdown
 table verbatim.
-
-> **Signature check:** `GetPromptAsync` / `ReadResourceAsync` argument and return shapes
-> are worth confirming against SDK 1.4.0 with the same reflection trick — the *concept*
-> (prompt = user-picked template, resource = app-attached data) is what matters and
-> won't change.
 
 **Takeaway:** **MCP ≠ just tools.** A tool is model-controlled and *acts*; a prompt is
 user-controlled and *templates*; a resource is app-controlled and *provides data*. Your
