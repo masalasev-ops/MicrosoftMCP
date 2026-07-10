@@ -1,0 +1,35 @@
+// Copy this file to `appsettings.Local.json` (same directory, drop the
+// `.example`) and fill in your key. That file is gitignored and never
+// committed.
+//
+// Anything you put here overrides the matching key in appsettings.json.
+// Only include the keys you actually want to change -- both files are
+// optional, and missing keys simply fall back to the defaults.
+//
+// In the WPF app, a key typed into the password box still wins over this
+// file at runtime.
+//
+// NOTE: appsettings.Local.json is copied into bin/ on build, so your key does
+// land on disk in the build output. Run `dotnet clean` to remove stale copies.
+{
+  // "openai" | "deepseek" | "ollama"   (ollama needs no key)
+  "Llm": {
+    "Provider": "deepseek"
+  },
+
+  "DeepSeek": {
+    "ApiKey": "sk-your-deepseek-key-here"
+  },
+
+  "OpenAI": {
+    "ApiKey": "sk-your-openai-key-here"
+  }
+
+  // Other keys you may override; defaults live in appsettings.json.
+  //
+  // "OpenAI":      { "ModelId": "gpt-4o" },
+  // "DeepSeek":    { "ModelId": "deepseek-v4-flash", "BaseUrl": "https://api.deepseek.com/v1" },
+  // "Ollama":      { "ModelId": "llama3.2", "BaseUrl": "http://localhost:11434/v1" },
+  // "Mcp":         { "Url": "https://learn.microsoft.com/api/mcp", "MaxTokenBudget": 2000 },
+  // "LocalServer": { "ProjectPath": "src/LearnMcpTutorial.Server" }
+}

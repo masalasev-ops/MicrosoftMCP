@@ -25,6 +25,7 @@ public sealed class MainViewModel : BaseViewModel, IAsyncDisposable
     private IChatClient? _cachedChatClient;
     private string? _lastProviderFingerprint;
     private CancellationTokenSource? _cts;
+    private int? _maxTokenBudget;
 
     // Persisted agent for multi-turn conversation. Rebuilt when the provider
     // config or the connected client changes; reset by Clear / Connect.
@@ -249,6 +250,7 @@ public sealed class MainViewModel : BaseViewModel, IAsyncDisposable
         var provider = _config["Llm:Provider"] ?? "openai";
         SelectedProviderIndex = provider.ToLowerInvariant() switch { "deepseek" => 1, "ollama" => 2, _ => 0 };
         McpUrl = _config["Mcp:Url"] ?? "https://learn.microsoft.com/api/mcp";
+        _maxTokenBudget = _config.GetValue<int?>("Mcp:MaxTokenBudget");
         LocalServerPath = ResolveLocalServerPath();
         UpdateDefaultsForProvider();
     }
@@ -301,7 +303,7 @@ public sealed class MainViewModel : BaseViewModel, IAsyncDisposable
                     Command: "dotnet",
                     Arguments: ["run", "--project", LocalServerPath, "--no-build"],
                     Label: "LearnMcpTutorial.Server")
-                : new HttpTransportConfig(McpUrl);
+                : new HttpTransportConfig(McpUrl, _maxTokenBudget);
 
             _learnClient = new LearnMcpClient(_loggerFactory.CreateLogger<LearnMcpClient>(), transport);
 
@@ -411,7 +413,9 @@ public sealed class MainViewModel : BaseViewModel, IAsyncDisposable
     /// </summary>
     private DocsAgent GetOrCreateAgent()
     {
-        var fp = $"{SelectedProvider}|{ModelId}|{ApiKey}|{BaseUrl}";
+        // Same fingerprint basis as BuildChatClient, so the two never disagree
+        // about whether the provider configuration changed.
+        var fp = $"{SelectedProvider}|{ModelId}|{EffectiveApiKey()}|{BaseUrl}";
         if (_docsAgent is null || _agentFingerprint != fp)
         {
             _docsAgent = new DocsAgent(BuildChatClient(), _learnClient!,
@@ -501,15 +505,30 @@ public sealed class MainViewModel : BaseViewModel, IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// The key typed into the password box, falling back to
+    /// <c>{Provider}:ApiKey</c> from appsettings.Local.json when the box is
+    /// empty. The box always wins when it has content.
+    /// </summary>
+    private string EffectiveApiKey()
+    {
+        if (!string.IsNullOrWhiteSpace(ApiKey)) return ApiKey;
+        var section = SelectedProvider switch { "openai" => "OpenAI", "deepseek" => "DeepSeek", _ => "Ollama" };
+        return _config[$"{section}:ApiKey"] ?? "";
+    }
+
     private IChatClient BuildChatClient()
     {
-        var fp = $"{SelectedProvider}|{ModelId}|{ApiKey}|{BaseUrl}";
+        // Fingerprint on the effective key, not the raw property, so that a key
+        // arriving from configuration still busts the cache.
+        var apiKey = EffectiveApiKey();
+        var fp = $"{SelectedProvider}|{ModelId}|{apiKey}|{BaseUrl}";
         if (_cachedChatClient is not null && _lastProviderFingerprint == fp) return _cachedChatClient;
         _cachedChatClient?.Dispose();
         _cachedChatClient = SelectedProvider switch
         {
-            "openai" => new OpenAIClient(ApiKey).GetChatClient(ModelId).AsIChatClient(),
-            "deepseek" => new OpenAIClient(new System.ClientModel.ApiKeyCredential(ApiKey),
+            "openai" => new OpenAIClient(apiKey).GetChatClient(ModelId).AsIChatClient(),
+            "deepseek" => new OpenAIClient(new System.ClientModel.ApiKeyCredential(apiKey),
                 new OpenAIClientOptions { Endpoint = new Uri(string.IsNullOrWhiteSpace(BaseUrl) ? "https://api.deepseek.com/v1" : BaseUrl) })
                 .GetChatClient(ModelId).AsIChatClient(),
             _ => new OpenAIClient(new System.ClientModel.ApiKeyCredential("ollama"),

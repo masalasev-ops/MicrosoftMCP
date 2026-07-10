@@ -14,9 +14,14 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Both files live at the repo root and are copied next to the binary.
+        // appsettings.Local.json is gitignored and holds the real values; it
+        // overrides the committed defaults. A key typed into the password box
+        // still wins over both at runtime.
         var config = new ConfigurationBuilder()
             .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: true)
+            .AddJsonFile("appsettings.Local.json", optional: true)
             .Build();
 
         var services = new ServiceCollection();

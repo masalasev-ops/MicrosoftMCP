@@ -100,7 +100,10 @@ var response = await _chatClient.GetResponseAsync(messages, options);
 **Run it** (needs an API key — or use Ollama, see the README):
 
 ```bash
-# PowerShell:  $env:OPENAI_API_KEY = "sk-..."
+# Put your key in appsettings.Local.json at the repo root first:
+#   { "OpenAI": { "ApiKey": "sk-..." } }
+# Copy appsettings.Local.json.example to get started. Environment variables
+# such as OPENAI_API_KEY are not read.
 dotnet run --project src/LearnMcpTutorial.Cli -- "How do I create an Azure Container App with managed identity?"
 ```
 

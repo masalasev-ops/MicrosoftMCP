@@ -214,16 +214,61 @@ for least-privilege guidance and why even read-only tool output is untrusted dat
 ```bash
 git clone <this-repo>
 cd MicrosoftMCP
+cp appsettings.Local.json.example appsettings.Local.json   # then add your key
 dotnet restore
 ```
 
-Keys are entered directly in the app's UI — no environment variables or
-user-secrets required. They are never persisted to disk.
+### Configuration
+
+All configuration lives in two JSON files at the repo root. Both are optional,
+and both are copied next to the binary at build time, so the CLI and the WPF app
+read exactly the same settings.
+
+| File | Committed? | Purpose |
+|---|---|---|
+| `appsettings.json` | yes | Non-secret defaults: provider flag, model ids, base URLs, MCP URL. |
+| `appsettings.Local.json` | **no — gitignored** | Your real values. Overrides `appsettings.json`. |
+
+Precedence, lowest to highest:
+
+```
+appsettings.json  →  appsettings.Local.json  →  WPF password box (runtime)
+```
+
+A minimal `appsettings.Local.json`:
+
+```jsonc
+{
+  "Llm":      { "Provider": "deepseek" },
+  "DeepSeek": { "ApiKey": "sk-..." }
+}
+```
+
+Copy `appsettings.Local.json.example` to get started; it documents every key you
+can override. Comments and trailing commas are allowed.
+
+In the WPF app you may still type a key into the password box, and it wins over
+both files. Leave the box empty to use the key from `appsettings.Local.json`.
+Ollama needs no key at all.
+
+**Environment variables are not read.** Earlier versions of the CLI honored
+`LLM_PROVIDER`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY` and `OLLAMA_MODEL`; those
+are gone. Use `Llm:Provider`, `OpenAI:ApiKey`, `DeepSeek:ApiKey` and
+`Ollama:ModelId` instead.
+
+> **A key in `appsettings.Local.json` does land on disk**, both there and in the
+> `bin/` copy produced at build time. `bin/` is gitignored, and so is
+> `appsettings.Local.json` itself, but the file is not encrypted. Deleting it
+> leaves the stale copy under `bin/` until you run `dotnet clean`. If you would
+> rather nothing touch the disk, leave the file out and type the key into the
+> WPF password box instead.
 
 ## 6. Project Structure
 
 ```
 MicrosoftMCP.slnx
+appsettings.json                  # Committed defaults: Llm:Provider, per-provider, Mcp, LocalServer
+appsettings.Local.json.example    # Template — copy to appsettings.Local.json (gitignored) and add your key
 src/
   LearnMcpTutorial.Core/          # Shared library (net10.0) — the CLIENT half
     LearnMcpTutorial.Core.csproj  # ModelContextProtocol 1.4.0, M.E.AI 10.7.0
@@ -251,7 +296,6 @@ src/
     Services/
       MarkdownRenderer.cs         # Markdown → FlowDocument with IDE-style code blocks
     Converters/Converters.cs      # BoolToVis, InverseBool, StatusToColor, Markdown converter
-    appsettings.json              # Llm:Provider flag + per-provider + LocalServer sections
 
 tests/
   LearnMcpTutorial.Tests/         # xUnit: DocsAgent unit tests + local-server integration test

@@ -18,16 +18,26 @@
     <ProjectReference Include="..\LearnMcpTutorial.Server\LearnMcpTutorial.Server.csproj"
                       ReferenceOutputAssembly="false" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" />
   </ItemGroup>
 
+  <!-- Configuration lives at the repo root and is shared with the CLI.
+       Both files are linked into the output directory next to the binary, which
+       is what SetBasePath(BaseDirectory) reads at startup.
+
+       appsettings.Local.json is gitignored and optional. The Exists() condition
+       is evaluated when the project is evaluated, so creating the file after a
+       build requires a rebuild before it is copied. -->
   <ItemGroup>
-    <None Update="appsettings.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
+    <None Include="$(RepoRoot)appsettings.json" Link="appsettings.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(RepoRoot)appsettings.Local.json" Link="appsettings.Local.json"
+          CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('$(RepoRoot)appsettings.Local.json')" />
   </ItemGroup>
 
 </Project>

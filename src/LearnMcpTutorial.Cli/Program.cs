@@ -3,6 +3,7 @@ using LearnMcpTutorial.Agent;
 using LearnMcpTutorial.Diagnostics;
 using LearnMcpTutorial.Mcp;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OpenAI;
 
@@ -21,15 +22,28 @@ using OpenAI;
 //   dotnet run --project src/LearnMcpTutorial.Cli -- "How do I create an Azure Container App?"
 //   dotnet run --project src/LearnMcpTutorial.Cli -- --local "What does HTTP 404 mean?"
 //
-// Provider config comes from environment variables:
-//   LLM_PROVIDER = openai | deepseek | ollama   (default: openai)
-//   OPENAI_API_KEY / DEEPSEEK_API_KEY           (not needed for ollama)
+// Configuration comes from two JSON files at the repo root, both optional and
+// both copied next to the binary at build time:
+//
+//   appsettings.json         committed defaults, no secrets
+//   appsettings.Local.json   gitignored, your real key — overrides the above
+//
+// Environment variables are NOT read. (Earlier versions of this CLI honored
+// LLM_PROVIDER / OPENAI_API_KEY / DEEPSEEK_API_KEY / OLLAMA_MODEL; those are
+// gone. Put the same values under Llm:Provider, OpenAI:ApiKey, DeepSeek:ApiKey
+// and Ollama:ModelId instead.)
 // ─────────────────────────────────────────────────────────────────────────
 
 var argList = args.ToList();
 bool useLocal = argList.Remove("--local");
 bool listOnly = argList.Remove("--list");
 var question = string.Join(' ', argList).Trim();
+
+var config = new ConfigurationBuilder()
+    .SetBasePath(AppContext.BaseDirectory)
+    .AddJsonFile("appsettings.json", optional: true)
+    .AddJsonFile("appsettings.Local.json", optional: true)
+    .Build();
 
 using var loggerFactory = LoggerFactory.Create(b => b
     .AddConsole()
@@ -41,7 +55,9 @@ McpTransportConfig transport = useLocal
         Command: "dotnet",
         Arguments: ["run", "--project", ResolveServerPath(), "--no-build"],
         Label: "LearnMcpTutorial.Server")
-    : new HttpTransportConfig("https://learn.microsoft.com/api/mcp");
+    : new HttpTransportConfig(
+        Setting("Mcp:Url") ?? "https://learn.microsoft.com/api/mcp",
+        config.GetValue<int?>("Mcp:MaxTokenBudget"));
 
 await using var client = new LearnMcpClient(loggerFactory.CreateLogger<LearnMcpClient>(), transport);
 
@@ -86,30 +102,64 @@ if (result.CitedUrls.Count > 0)
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-// Build the raw LLM client from environment config. Same three providers as
-// the WPF app — all OpenAI-compatible via Microsoft.Extensions.AI.OpenAI.
+// Reads a configuration value, treating "" (which is what appsettings.json
+// ships for the ApiKey placeholders) the same as a missing key.
+string? Setting(string key) => string.IsNullOrWhiteSpace(config[key]) ? null : config[key];
+
+// Build the raw LLM client from configuration. Same three providers as the WPF
+// app — all OpenAI-compatible via Microsoft.Extensions.AI.OpenAI.
+//
+// DeepSeek's legacy aliases deepseek-chat / deepseek-reasoner retire on
+// 2026-07-24. The default below is the non-legacy deepseek-v4-flash, so nothing
+// here needs to change when they go.
 IChatClient BuildChatClient()
 {
-    var provider = (Environment.GetEnvironmentVariable("LLM_PROVIDER") ?? "openai").ToLowerInvariant();
+    var provider = (Setting("Llm:Provider") ?? "openai").ToLowerInvariant();
     return provider switch
     {
-        "deepseek" => new OpenAIClient(
-                new ApiKeyCredential(RequireKey("DEEPSEEK_API_KEY")),
-                new OpenAIClientOptions { Endpoint = new Uri("https://api.deepseek.com/v1") })
-            .GetChatClient("deepseek-v4-flash").AsIChatClient(),
-        "ollama" => new OpenAIClient(
-                new ApiKeyCredential("ollama"),
-                new OpenAIClientOptions { Endpoint = new Uri("http://localhost:11434/v1") })
-            .GetChatClient(Environment.GetEnvironmentVariable("OLLAMA_MODEL") ?? "llama3.2").AsIChatClient(),
-        _ => new OpenAIClient(RequireKey("OPENAI_API_KEY"))
-            .GetChatClient("gpt-4o-mini").AsIChatClient()
+        "deepseek" => Chat(
+            RequireKey("DeepSeek"),
+            Setting("DeepSeek:ModelId") ?? "deepseek-v4-flash",
+            Setting("DeepSeek:BaseUrl") ?? "https://api.deepseek.com/v1"),
+        // Ollama runs locally and ignores the credential, but the OpenAI client
+        // insists on a non-empty one.
+        "ollama" => Chat(
+            "ollama",
+            Setting("Ollama:ModelId") ?? "llama3.2",
+            Setting("Ollama:BaseUrl") ?? "http://localhost:11434/v1"),
+        // appsettings.json intentionally has no OpenAI:BaseUrl, so the client
+        // keeps its own default endpoint unless one is configured.
+        _ => Chat(
+            RequireKey("OpenAI"),
+            Setting("OpenAI:ModelId") ?? "gpt-4o-mini",
+            Setting("OpenAI:BaseUrl"))
     };
 }
 
-static string RequireKey(string envVar) =>
-    Environment.GetEnvironmentVariable(envVar)
+static IChatClient Chat(string apiKey, string modelId, string? baseUrl) =>
+    (baseUrl is null
+        ? new OpenAIClient(new ApiKeyCredential(apiKey))
+        : new OpenAIClient(new ApiKeyCredential(apiKey),
+            new OpenAIClientOptions { Endpoint = new Uri(baseUrl) }))
+    .GetChatClient(modelId).AsIChatClient();
+
+string RequireKey(string section) =>
+    Setting($"{section}:ApiKey")
         ?? throw new InvalidOperationException(
-            $"Set {envVar} (or use --list to skip the LLM, or LLM_PROVIDER=ollama for no key).");
+            // $$ so that the JSON braces below are literal and {{section}} interpolates.
+            $$"""
+              No API key configured for provider '{{section}}'.
+
+              Add it to appsettings.Local.json at the repo root:
+
+                  { "{{section}}": { "ApiKey": "sk-..." } }
+
+              Copy appsettings.Local.json.example to get started. That file is
+              gitignored, so your key is never committed.
+
+              Alternatives: pass --list to skip the LLM entirely, or set
+              Llm:Provider to "ollama" to run a local model with no key.
+              """);
 
 // Walk up from the CLI's base dir to the repo root (MicrosoftMCP.slnx),
 // then point at the server project so --local can launch it over stdio.
