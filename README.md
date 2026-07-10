@@ -263,6 +263,56 @@ are gone. Use `Llm:Provider`, `OpenAI:ApiKey`, `DeepSeek:ApiKey` and
 > rather nothing touch the disk, leave the file out and type the key into the
 > WPF password box instead.
 
+### Platform support
+
+Only the GUI is Windows-only. Everything else — including the full test suite —
+runs on any OS the .NET 10 SDK supports, and CI proves it on both Windows and
+Linux.
+
+| Project | Target | Windows | Linux / macOS |
+|---|---|---|---|
+| `LearnMcpTutorial.Core` | `net10.0` | ✅ | ✅ |
+| `LearnMcpTutorial.Server` | `net10.0` | ✅ | ✅ |
+| `LearnMcpTutorial.Cli` | `net10.0` | ✅ | ✅ |
+| `LearnMcpTutorial.Tests` | `net10.0` | ✅ | ✅ |
+| `steps/step2-list-tools` | `net10.0` | ✅ | ✅ |
+| `docs/typeprobe` | `net10.0` | ✅ | ✅ |
+| `LearnMcpTutorial.Wpf` | `net10.0-windows` | ✅ | ❌ WPF is Windows-only |
+
+Because the solution contains the WPF project, `dotnet build MicrosoftMCP.slnx`
+only works on Windows. On Linux and macOS, build the projects individually — see
+[.github/workflows/ci.yml](.github/workflows/ci.yml) for the exact commands.
+
+### Building from source
+
+```bash
+git clone <this-repo>
+cd MicrosoftMCP
+
+# Optional: only needed to actually ask questions. `--list` and `dotnet test`
+# work without a key.
+cp appsettings.Local.json.example appsettings.Local.json
+
+dotnet restore
+dotnet build MicrosoftMCP.slnx     # Windows; see the table above for other OSes
+dotnet test
+```
+
+A few things worth knowing before you change a `.csproj`:
+
+- **The SDK is pinned.** [global.json](global.json) fixes the .NET SDK at
+  `10.0.301` with `rollForward: latestFeature`, so a newer 10.0.x band is fine
+  but a missing .NET 10 SDK fails loudly.
+- **Package versions are centralized.** [Directory.Packages.props](Directory.Packages.props)
+  enables Central Package Management: `<PackageReference>` carries no `Version`
+  attribute. Add or bump versions there, not in the project file.
+- **Shared properties are centralized.** [Directory.Build.props](Directory.Build.props)
+  sets `TargetFramework`, `Nullable`, `LangVersion` and `$(RepoRoot)` for every
+  project. A project may still override any of them — WPF overrides
+  `TargetFramework`.
+- **Both props files apply to `steps/` and `docs/typeprobe/` too**, even though
+  neither is in the solution: MSBuild walks the directory tree, not the solution.
+
 ## 6. Project Structure
 
 ```
@@ -393,8 +443,9 @@ dispatches trace entries to the UI.
 
 ### Provider switching via feature flag
 
-Set `Llm:Provider` in `appsettings.json` to choose your default. Each provider has
-its own configuration section:
+Set `Llm:Provider` in `appsettings.Local.json` to choose your default — the
+committed `appsettings.json` ships `openai`. Each provider has its own
+configuration section:
 
 | Feature flag | Provider | Default model |
 |---|---|---|
@@ -402,7 +453,15 @@ its own configuration section:
 | `"Llm": { "Provider": "deepseek" }` | DeepSeek | `deepseek-v4-flash` |
 | `"Llm": { "Provider": "ollama" }` | Ollama (local) | `llama3.2` |
 
+Both apps read `{Section}:ModelId`, `{Section}:BaseUrl` and `{Section}:ApiKey`
+from the matching section. `OpenAI` has no `BaseUrl` by default, so the OpenAI
+client keeps its own endpoint unless you set one.
+
 You can also switch providers at runtime via the dropdown in the UI.
+
+> DeepSeek's legacy model aliases `deepseek-chat` and `deepseek-reasoner` retire
+> on **2026-07-24**. This repo already defaults to the non-legacy
+> `deepseek-v4-flash`, so no action is needed.
 
 ## 7. The WPF GUI
 
@@ -490,6 +549,9 @@ Dormant layers appear in muted colors; the active layer glows.
 | 8 | LLM synthesizes final answer with cited sources |
 
 ### Running
+
+**Windows only** — WPF targets `net10.0-windows`. On Linux and macOS use the
+headless CLI instead; it runs the same `DocsAgent`.
 
 ```bash
 dotnet run --project src/LearnMcpTutorial.Wpf
@@ -629,31 +691,52 @@ vs. write, gated vs. ungated — is the entire point of the annotations above.
 | `405 Method Not Allowed` on `/api/mcp` | Expected — the endpoint is MCP-only | Use MCP Inspector instead |
 | Empty/irrelevant search results | Vague query | Rephrase more specifically; use terms from the docs |
 | Tool not found error | Stale tool cache | The agent auto-refreshes; click Connect again |
-| No API key / auth error | Missing or wrong key | Enter your key in the API Key field in the UI |
+| `No API key configured for provider '...'` | No key in config | Add `{Provider}:ApiKey` to `appsettings.Local.json`, or type it into the WPF password box. `--list` needs no key. |
+| CLI ignores `OPENAI_API_KEY` | Environment variables are no longer read | Move the value to `appsettings.Local.json` — see [§5](#5-prerequisites--setup) |
+| Config change has no effect | `appsettings.Local.json` is copied to `bin/` at build time | Rebuild. After deleting it, `dotnet clean` to drop the stale copy. |
+| `Could not reach the MCP server at ...` | Bad `Mcp:Url`, no network, or server down | Check the URL and your connection |
+| `Could not find the local MCP server` | `LocalServer:ProjectPath` is wrong, or the solution isn't built | Build the solution, or point the setting at the server's project directory |
+| `The MCP server exited before the handshake completed` | Server crashed on startup | Run `dotnet run --project src/LearnMcpTutorial.Server` directly to see its output |
 | Ollama not responding | Ollama not running | Run `ollama serve` then pull a model |
 | Build error: `ModelContextProtocol.Transport` not found | Namespace changed | Transport types are in `ModelContextProtocol.Client` in v1.4.0 |
+| `NU1008` on build | A `<PackageReference>` has a `Version` attribute | Versions live in [Directory.Packages.props](Directory.Packages.props) — remove the attribute |
 
 ## 12. Testing
 
-The [tests/LearnMcpTutorial.Tests/](tests/LearnMcpTutorial.Tests/) project (xUnit) covers both layers:
+The [tests/LearnMcpTutorial.Tests/](tests/LearnMcpTutorial.Tests/) project (xUnit) covers
+every layer. Every test is network-free and token-free, so no API key is needed:
 
 ```bash
 dotnet test
 ```
 
-- **Unit tests** ([DocsAgentTests.cs](tests/LearnMcpTutorial.Tests/DocsAgentTests.cs)) drive
-  `DocsAgent` with a scripted `IChatClient` ([ScriptedChatClient.cs](tests/LearnMcpTutorial.Tests/ScriptedChatClient.cs)) —
-  no network, no tokens. They verify the tool-calling loop invokes a fake tool,
-  the trace callback fires per round-trip, multi-turn history carries context,
-  `ResetConversation` clears it, streaming yields deltas, and URL extraction works.
-- **Integration test** ([LocalServerIntegrationTests.cs](tests/LearnMcpTutorial.Tests/LocalServerIntegrationTests.cs))
-  launches the real stdio server and asserts all three tools are discovered.
+- **Agent unit tests** ([DocsAgentTests.cs](tests/LearnMcpTutorial.Tests/DocsAgentTests.cs)) drive
+  `DocsAgent` with a scripted `IChatClient` ([ScriptedChatClient.cs](tests/LearnMcpTutorial.Tests/ScriptedChatClient.cs)).
+  They verify the tool-calling loop invokes a fake tool, the trace callback fires
+  per round-trip, multi-turn history carries context, `ResetConversation` clears
+  it, streaming yields deltas, and URL extraction works.
+- **Client integration test** ([LocalServerIntegrationTests.cs](tests/LearnMcpTutorial.Tests/LocalServerIntegrationTests.cs))
+  proves `LearnMcpClient` completes the stdio handshake and discovers all three tools.
+- **Server tests** ([LocalServerToolTests.cs](tests/LearnMcpTutorial.Tests/LocalServerToolTests.cs))
+  call every tool and check its output, assert the trust annotations each tool
+  advertises (all `ReadOnly`; `days_until` correctly *not* idempotent), exercise the
+  `code_review` prompt with and without arguments, and read the `dotnet-versions` resource.
+- **CLI argument tests** ([CliArgsTests.cs](tests/LearnMcpTutorial.Tests/CliArgsTests.cs))
+  pin `--local` / `--list` parsing, flag-order independence, and question passthrough.
+
+The real server is launched over stdio **once** for the whole run by
+[LocalServerFixture](tests/LearnMcpTutorial.Tests/LocalServerFixture.cs), which
+resolves it with the same `LocalServerLocator` the CLI and WPF app use.
+
+> Run tests in the **Debug** configuration. The fixture launches the server with
+> `dotnet run --no-build`, which resolves `bin/Debug`; `dotnet test -c Release`
+> would build the server elsewhere and the child process would fail to start.
 
 ## 13. Extend It
 
 - **Add a second MCP server:** Create another `LearnMcpClient` for a different endpoint, merge tools into `ChatOptions.Tools`.
 - **Add a tool to the local server:** Register another `McpServerTool` in `Program.cs`; the CLI and WPF discover it automatically (dynamic discovery).
-- **Use `maxTokenBudget`:** Append `?maxTokenBudget=2000` to cap search response size.
+- **Cap search response size:** set `"Mcp": { "MaxTokenBudget": 2000 }` in `appsettings.Local.json`. Both apps pass it to `HttpTransportConfig`, which appends `?maxTokenBudget=` to the endpoint. It is `null` by default.
 - **Swap to Azure OpenAI:** Replace `OpenAI.OpenAIClient` with an Azure OpenAI client — `Microsoft.Extensions.AI` accepts any `IChatClient`.
 - **Add Anthropic:** Use the official Anthropic .NET SDK wrapped as `IChatClient`.
 
@@ -686,4 +769,7 @@ dotnet test
 
 ## License
 
-MIT — use this code as a starting point for your own MCP-powered .NET agents.
+> **No `LICENSE` file has been added yet**, so this repository is under default
+> copyright ("all rights reserved") until one is. The intent is MIT — use this
+> code as a starting point for your own MCP-powered .NET agents — but that only
+> becomes legally effective once a `LICENSE` file lands.

@@ -170,6 +170,15 @@ dotnet run --project src/LearnMcpTutorial.Cli -- --local --list
 dotnet run --project src/LearnMcpTutorial.Cli -- --local "What does HTTP 404 mean?"
 ```
 
+`--local` finds the server through
+[LocalServerLocator](../src/LearnMcpTutorial.Core/Mcp/LocalServerLocator.cs): first the
+project directory from `LocalServer:ProjectPath` (relative paths resolve against the
+repo root), then a published `LearnMcpTutorial.Server.dll` sitting next to the CLI.
+That second probe only fires if you publish the CLI **and** the server into the same
+folder — an ordinary build does not copy the server's assembly next to the CLI, since
+the reference is declared `ReferenceOutputAssembly="false"`. If neither is found the
+CLI names every path it tried instead of hanging.
+
 **Takeaway:** MCP clients are **server-agnostic**. Swapping remote↔local changes
 one `switch` arm in [LearnMcpClient.ConnectAsync](../src/LearnMcpTutorial.Core/Mcp/LearnMcpClient.cs);
 the agent, tool loop, and tracing are untouched. See the README's
@@ -190,7 +199,7 @@ wraps the identical Core library in a desktop app with:
   sequence step in real time,
 - and **IDE-style markdown rendering** for code in answers.
 
-**Run it:**
+**Run it** (Windows only — WPF targets `net10.0-windows`):
 
 ```bash
 dotnet run --project src/LearnMcpTutorial.Wpf

@@ -10,11 +10,17 @@ This guide walks through demonstrating all MCP core concepts using the WPF GUI a
 
 ## Getting Started
 
+Windows only — WPF targets `net10.0-windows`.
+
 ```bash
 dotnet run --project src/LearnMcpTutorial.Wpf
 ```
 
 The app opens with two tabs: **Demo** and **Architecture**.
+
+You can type your API key into the password box, or put it in
+`appsettings.Local.json` at the repo root (copy `appsettings.Local.json.example`)
+and leave the box empty. The box wins whenever it has content.
 
 ## Tab 1: Demo — Interactive Q&A
 
