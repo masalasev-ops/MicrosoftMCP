@@ -1,0 +1,93 @@
+# EditorConfig — encodes the style this repo already uses.
+#
+# Everything here is `suggestion` severity on purpose: these rules describe
+# existing conventions, they do not enforce new ones. Nothing in this file
+# reformats the tree or fails a build. EnforceCodeStyleInBuild is deliberately
+# left unset.
+#
+# `end_of_line` is intentionally absent: .gitattributes owns line endings
+# (LF in the repo, native on checkout), so pinning it here would make Windows
+# and Linux checkouts disagree with their own working trees.
+
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# XML-family project and build files use 2 spaces.
+[*.{csproj,props,targets,slnx,config,xml}]
+indent_size = 2
+
+[*.{json,jsonc,yml,yaml}]
+indent_size = 2
+
+[*.md]
+indent_size = 2
+# Two trailing spaces are a hard line break in Markdown.
+trim_trailing_whitespace = false
+
+[*.xaml]
+indent_size = 4
+
+[*.cs]
+indent_size = 4
+
+# ── Language conventions ───────────────────────────────────────────────────
+
+# File-scoped namespaces (`namespace LearnMcpTutorial.Mcp;`) are used throughout.
+csharp_style_namespace_declarations = file_scoped:suggestion
+
+# `var` is used pervasively.
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+# Expression-bodied members appear on helpers and simple properties.
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_expression_bodied_accessors = true:suggestion
+
+# Modern C# the codebase already relies on.
+csharp_style_prefer_switch_expression = true:suggestion
+csharp_style_prefer_pattern_matching = true:suggestion
+csharp_style_prefer_not_pattern = true:suggestion
+csharp_style_implicit_object_creation_when_type_is_apparent = true:suggestion
+csharp_prefer_simple_using_statement = true:suggestion
+csharp_style_prefer_primary_constructors = false:suggestion
+
+dotnet_style_object_initializer = true:suggestion
+dotnet_style_collection_initializer = true:suggestion
+dotnet_style_null_propagation = true:suggestion
+dotnet_style_coalesce_expression = true:suggestion
+dotnet_style_prefer_conditional_expression_over_assignment = true:suggestion
+dotnet_style_prefer_conditional_expression_over_return = true:suggestion
+
+# `using System...` first, matching the existing files.
+dotnet_sort_system_directives_first = true
+csharp_using_directive_placement = outside_namespace:suggestion
+
+# ── Naming: private instance fields are _camelCase ─────────────────────────
+
+dotnet_naming_rule.private_fields_underscore_camel.symbols  = private_fields
+dotnet_naming_rule.private_fields_underscore_camel.style    = underscore_camel_case
+dotnet_naming_rule.private_fields_underscore_camel.severity = suggestion
+
+dotnet_naming_symbols.private_fields.applicable_kinds           = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_fields.required_modifiers         =
+
+dotnet_naming_style.underscore_camel_case.capitalization  = camel_case
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+
+# Constants and statics stay PascalCase.
+dotnet_naming_rule.constants_pascal.symbols  = constants
+dotnet_naming_rule.constants_pascal.style    = pascal_case
+dotnet_naming_rule.constants_pascal.severity = suggestion
+
+dotnet_naming_symbols.constants.applicable_kinds   = field
+dotnet_naming_symbols.constants.required_modifiers = const
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
