@@ -774,6 +774,33 @@ resolves it with the same `LocalServerLocator` the CLI and WPF app use.
 | Streaming aggregation | `IEnumerable<ChatResponseUpdate>.ToChatResponse()` reconstructs a `ChatResponse` from stream deltas | M.E.AI 10.7.0 (compiles + tested) |
 | Middleware order | `ChatClientBuilder`: first-registered = outermost, so `UseFunctionInvocation()` is registered before the tracing `Use(...)` to place the tracer *inside* the loop | Verified by unit test (per-round-trip trace) |
 
+### How the "assembly reflection" facts were verified
+
+**Lesson: don't trust training data about fast-moving APIs — verify against the
+shipped assembly.** While building this, several assumptions about the MCP and
+`Microsoft.Extensions.AI` SDKs turned out wrong — constructor shapes, property
+names, whether a type even existed. Rather than guess, reference the exact
+package version and reflect over the real type. Every row above marked
+*SDK assembly reflection* was confirmed this way. In a throwaway console app
+(`dotnet new console` then `dotnet add package Microsoft.Extensions.AI --version 10.7.0`):
+
+```csharp
+using System.Reflection;
+using Microsoft.Extensions.AI;
+
+// Print the real property and constructor shapes instead of trusting memory.
+var t = typeof(FunctionInvokingChatClient);
+foreach (var p in t.GetProperties())
+    Console.WriteLine($"{p.PropertyType.Name} {p.Name}");
+foreach (var c in t.GetConstructors())
+    Console.WriteLine($"ctor({string.Join(", ", c.GetParameters().Select(p => $"{p.ParameterType.Name} {p.Name}"))})");
+```
+
+Running it prints `Int32 MaximumIterationsPerRequest` and the single
+`ctor(IChatClient, ILoggerFactory, IServiceProvider)` — exactly the values in
+the table above. (Reference the package so its dependencies resolve; a bare
+`Assembly.LoadFrom` of the DLL fails to load `Microsoft.Extensions.AI.Abstractions`.)
+
 ## License
 
 > **No `LICENSE` file has been added yet**, so this repository is under default
