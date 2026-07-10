@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+# Both jobs deliberately use the default Debug configuration. The integration
+# tests launch the MCP server with `dotnet run --no-build`, which resolves
+# bin/Debug; building the tests as Release would leave the server in bin/Release
+# and the child process would fail to start.
+
+jobs:
+  windows:
+    name: Windows (full solution, incl. WPF)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore MicrosoftMCP.slnx
+
+      - name: Build
+        run: dotnet build MicrosoftMCP.slnx --no-restore
+
+      - name: Test
+        run: dotnet test MicrosoftMCP.slnx --no-build
+
+  linux:
+    name: Linux (cross-platform projects, excl. WPF)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # LearnMcpTutorial.Wpf targets net10.0-windows and cannot build here, and
+      # MicrosoftMCP.slnx contains it -- so the solution is never built on Linux.
+      # Everything else must work on any OS, and this job proves it.
+      - name: Build Core
+        run: dotnet build src/LearnMcpTutorial.Core/LearnMcpTutorial.Core.csproj
+
+      - name: Build Server
+        run: dotnet build src/LearnMcpTutorial.Server/LearnMcpTutorial.Server.csproj
+
+      - name: Build Cli
+        run: dotnet build src/LearnMcpTutorial.Cli/LearnMcpTutorial.Cli.csproj
+
+      # Also builds Core, Cli and Server via project references, so the stdio
+      # integration tests find a built server to launch.
+      - name: Test
+        run: dotnet test tests/LearnMcpTutorial.Tests/LearnMcpTutorial.Tests.csproj
+
+      # Out-of-solution projects. Central Package Management reaches them from
+      # the repo root, so a broken Directory.Packages.props breaks them too.
+      - name: Build steps/step2-list-tools
+        run: dotnet build steps/step2-list-tools/step2-list-tools.csproj
+
+      - name: Build docs/typeprobe
+        run: dotnet build docs/typeprobe/_typeprobe.csproj
+
+      # The headless CLI must run on Linux against the local stdio server.
+      # --list needs no API key and no network.
+      - name: Smoke-test CLI against the local server
+        run: dotnet run --project src/LearnMcpTutorial.Cli --no-build -- --local --list
