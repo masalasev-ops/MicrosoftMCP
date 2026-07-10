@@ -127,8 +127,12 @@ var daysUntilTool = McpServerTool.Create(
 options.ToolCollection.Add(daysUntilTool);
 
 // ── Prompt: code_review ────────────────────────────────────────────────
+// Both parameters need default values, not just nullable types: MCP derives
+// PromptArgument.Required from whether a default exists. Without them the server
+// advertised language and focus as required, a prompts/get with no arguments
+// failed outright, and the blank-input fallbacks below were unreachable.
 var codeReviewPrompt = McpServerPrompt.Create(
-    (string? language, string? focus) =>
+    (string? language = null, string? focus = null) =>
     {
         var lang = string.IsNullOrWhiteSpace(language) ? "the code" : language;
         var areas = string.IsNullOrWhiteSpace(focus) ? "correctness, readability, performance, and security" : focus;
