@@ -19,6 +19,11 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Console" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- CliArgs is internal; the test project asserts on it directly. -->
+    <InternalsVisibleTo Include="LearnMcpTutorial.Tests" />
+  </ItemGroup>
+
   <!-- Configuration lives at the repo root and is shared with the WPF app.
        Both files are linked into the output directory next to the binary, which
        is what SetBasePath(AppContext.BaseDirectory) reads at startup.

@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\LearnMcpTutorial.Core\LearnMcpTutorial.Core.csproj" />
+    <!-- CliArgs is tested directly; the Cli exposes it via InternalsVisibleTo. -->
+    <ProjectReference Include="..\..\src\LearnMcpTutorial.Cli\LearnMcpTutorial.Cli.csproj" />
     <!-- Build-only: ensures the local MCP server is compiled so the
          integration test can launch it over stdio without a rebuild. -->
     <ProjectReference Include="..\..\src\LearnMcpTutorial.Server\LearnMcpTutorial.Server.csproj"

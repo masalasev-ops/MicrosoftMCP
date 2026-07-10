@@ -1,5 +1,6 @@
 using System.ClientModel;
 using LearnMcpTutorial.Agent;
+using LearnMcpTutorial.Cli;
 using LearnMcpTutorial.Diagnostics;
 using LearnMcpTutorial.Mcp;
 using Microsoft.Extensions.AI;
@@ -34,10 +35,7 @@ using OpenAI;
 // and Ollama:ModelId instead.)
 // ─────────────────────────────────────────────────────────────────────────
 
-var argList = args.ToList();
-bool useLocal = argList.Remove("--local");
-bool listOnly = argList.Remove("--list");
-var question = string.Join(' ', argList).Trim();
+var (useLocal, listOnly, question) = CliArgs.Parse(args);
 
 var config = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
